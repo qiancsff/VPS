@@ -126,51 +126,6 @@ update_fail2ban_config() {
 configure_nftables() {
   local nftables_conf="/etc/nftables.conf"
 
-  # 创建 nftables 配置文件
-  cat <<EOF > "$nftables_conf"
-table ip filter {
-    chain input {
-        type filter hook input priority 0; policy drop;
-        iif lo accept
-        ip daddr 127.0.0.0/8 iif != lo drop
-        ct state established,related accept
-        tcp dport { 80, 443 } accept
-        udp dport 443 accept
-        tcp dport 2222 ct state new accept
-        icmp type echo-request accept
-        icmp type destination-unreachable accept
-        log prefix "iptables denied: " level info
-        drop
-    }
-    chain forward {
-        type filter hook forward priority 0; policy drop;
-    }
-    chain output {
-        type filter hook output priority 0; policy accept;
-    }
-}
-
-table ip6 filter {
-    chain input {
-        type filter hook input priority 0; policy drop;
-        iif lo accept
-        ip6 daddr ::1 iif != lo drop
-        ct state established,related accept
-        tcp dport { 80, 443 } accept
-        udp dport 443 accept
-        tcp dport 2222 ct state new accept
-        icmpv6 type echo-request accept
-        log prefix "iptables denied: " level info
-        drop
-    }
-    chain forward {
-        type filter hook forward priority 0; policy drop;
-    }
-    chain output {
-        type filter hook output priority 0; policy accept;
-    }
-}
-EOF
 
   # 验证并加载 nftables 配置
   if nft -c -f "$nftables_conf"; then
