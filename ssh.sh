@@ -25,19 +25,13 @@ check_root() {
 # 函数：备份文件
 backup_file() {
   local file="$1"
-  if [ -f "$file" ]; then
-    cp "$file" "$file.bak"
-    log "Backed up $file to $file.bak"
-  fi
+  [ -f "$file" ] && cp "$file" "$file.bak" && log "Backed up $file to $file.bak"
 }
 
 # 函数：恢复文件
 restore_file() {
   local file="$1"
-  if [ -f "$file.bak" ]; then
-    mv "$file.bak" "$file"
-    log "Restored $file from $file.bak"
-  fi
+  [ -f "$file.bak" ] && mv "$file.bak" "$file" && log "Restored $file from $file.bak"
 }
 
 # 函数：添加 SSH 公钥
@@ -68,7 +62,7 @@ update_ssh_config() {
     echo "PasswordAuthentication no"
     echo "PubkeyAuthentication yes"
   } >> "$sshd_config"
-
+  
   if systemctl restart ssh; then
     log "SSH configuration updated and service restarted"
   else
@@ -107,36 +101,29 @@ configure_fail2ban() {
     log "fail2ban installed"
   fi
 
+  # 创建 fail2ban 配置文件
+  cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+destemail = qiancsf@163.com
+sendername = Fail2Ban
+
+[sshd]
+backend = systemd
+enabled = true
+port = 2222
+mode = aggressive
+bantime = 240h
+findtime = 60m
+maxretry = 1
+EOF
+
+  # 修改 fail2ban.conf 文件中的 allowipv6
+  sed -i 's/#allowipv6 = auto/allowipv6 = auto/' /etc/fail2ban/fail2ban.conf
+  
   # 设置日志清理计划
   echo "0 0 * * * truncate -s 0 /var/log/fail2ban.log" >> /etc/crontab
   systemctl restart fail2ban
   log "fail2ban configured and service restarted"
-}
-
-# 函数：更新 Fail2Ban 配置文件中的 allowipv6 选项
-update_fail2ban_config() {
-  local fail2ban_conf="/etc/fail2ban/fail2ban.conf"
-
-  if [ -f "$fail2ban_conf" ]; then
-    # 替换 #allowipv6 = auto 行
-    sed -i 's/#allowipv6 = auto/allowipv6 = auto/' "$fail2ban_conf"
-    log "Updated allowipv6 setting in $fail2ban_conf"
-  else
-    log "$fail2ban_conf not found"
-  fi
-}
-
-# 函数：配置 nftables
-configure_nftables() {
-  local nftables_conf="/etc/nftables.conf"
-
-  if nft -c -f "$nftables_conf"; then
-    nft -f "$nftables_conf"
-    log "nftables configured successfully"
-  else
-    log "nftables configuration failed"
-    exit 1
-  fi
 }
 
 # 函数：启动 nftables
@@ -153,7 +140,5 @@ add_ssh_key
 update_ssh_config
 update_system
 configure_fail2ban
-update_fail2ban_config
-configure_nftables
 start_nftables
 log "Script completed"
