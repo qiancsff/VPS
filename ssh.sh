@@ -104,23 +104,39 @@ configure_fail2ban() {
   # 创建 fail2ban 配置文件
   cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
-destemail = qiancsf@163.com
-sendername = Fail2Ban
+destemail = qiancsf@163.com  # 接收警报的电子邮件地址
+sendername = Fail2Ban        # 发送警报的名称
+banaction = nftables-multiport  # 使用 nftables 作为防火墙后端
 
 [sshd]
-backend = systemd
-enabled = true
-port = 2222
-mode = aggressive
-bantime = 240h
-findtime = 60m
-maxretry = 1
+backend = systemd           # 使用 systemd 作为后端
+enabled = true              # 启用 sshd 监控
+port = 2222                 # SSH 服务使用的端口
+mode = aggressive           # 使用较为严格的防护模式
+bantime = 240h              # 禁止时间为 240 小时
+findtime = 60m              # 在 60 分钟内达到最大重试次数将会被禁止
+maxretry = 1                # 失败重试次数限制为 1 次
+
 EOF
 
   # 设置日志清理计划
   echo "0 0 * * * truncate -s 0 /var/log/fail2ban.log" >> /etc/crontab
   systemctl restart fail2ban
   log "fail2ban configured and service restarted"
+}
+
+# 函数：更新 Fail2Ban 配置文件中的 allowipv6 选项
+update_fail2ban_config() {
+  local fail2ban_conf="/etc/fail2ban/fail2ban.conf"
+
+  # 确保配置文件存在
+  if [ -f "$fail2ban_conf" ]; then
+    # 替换 #allowipv6 = auto 行
+    sed -i 's/#allowipv6 = auto/allowipv6 = auto/' "$fail2ban_conf"
+    log "Updated allowipv6 setting in $fail2ban_conf"
+  else
+    log "$fail2ban_conf not found"
+  fi
 }
 
 # 函数：配置 nftables
@@ -197,6 +213,7 @@ add_ssh_key
 update_ssh_config
 update_system
 configure_fail2ban
+update_fail2ban_config
 configure_nftables
 start_nftables
 log "Script completed"
