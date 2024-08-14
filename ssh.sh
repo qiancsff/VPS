@@ -25,13 +25,19 @@ check_root() {
 # 函数：备份文件
 backup_file() {
   local file="$1"
-  [ -f "$file" ] && cp "$file" "$file.bak" && log "Backed up $file to $file.bak"
+  if [ -f "$file" ]; then
+    cp "$file" "$file.bak"
+    log "Backed up $file to $file.bak"
+  fi
 }
 
 # 函数：恢复文件
 restore_file() {
   local file="$1"
-  [ -f "$file.bak" ] && mv "$file.bak" "$file" && log "Restored $file from $file.bak"
+  if [ -f "$file.bak" ]; then
+    mv "$file.bak" "$file"
+    log "Restored $file from $file.bak"
+  fi
 }
 
 # 函数：添加 SSH 公钥
@@ -62,7 +68,7 @@ update_ssh_config() {
     echo "PasswordAuthentication no"
     echo "PubkeyAuthentication yes"
   } >> "$sshd_config"
-  
+
   if systemctl restart ssh; then
     log "SSH configuration updated and service restarted"
   else
@@ -101,7 +107,6 @@ configure_fail2ban() {
     log "fail2ban installed"
   fi
 
-
   # 设置日志清理计划
   echo "0 0 * * * truncate -s 0 /var/log/fail2ban.log" >> /etc/crontab
   systemctl restart fail2ban
@@ -112,7 +117,6 @@ configure_fail2ban() {
 update_fail2ban_config() {
   local fail2ban_conf="/etc/fail2ban/fail2ban.conf"
 
-  # 确保配置文件存在
   if [ -f "$fail2ban_conf" ]; then
     # 替换 #allowipv6 = auto 行
     sed -i 's/#allowipv6 = auto/allowipv6 = auto/' "$fail2ban_conf"
@@ -126,8 +130,6 @@ update_fail2ban_config() {
 configure_nftables() {
   local nftables_conf="/etc/nftables.conf"
 
-
-  # 验证并加载 nftables 配置
   if nft -c -f "$nftables_conf"; then
     nft -f "$nftables_conf"
     log "nftables configured successfully"
