@@ -110,7 +110,7 @@ banaction = nftables-multiport  # 使用 nftables 作为防火墙后端
 
 [sshd]
 backend = systemd           # 使用 systemd 作为后端
-enable = true              # 启用 sshd 监控
+enabled = true              # 启用 sshd 监控
 port = 2222                 # SSH 服务使用的端口
 mode = aggressive           # 使用较为严格的防护模式
 bantime = 240h              # 禁止时间为 240 小时
