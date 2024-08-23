@@ -50,27 +50,6 @@ add_ssh_key() {
   fi
 }
 
-# 函数：更新 SSH 配置
-update_ssh_config() {
-  local sshd_config="/etc/ssh/sshd_config"
-  local port=2222
-
-  backup_file "$sshd_config"
-  sed -i "/^Port 22/d" "$sshd_config"
-  {
-    echo "Port $port"
-    echo "PasswordAuthentication no"
-    echo "PubkeyAuthentication yes"
-  } >> "$sshd_config"
-  
-  if systemctl restart ssh; then
-    log "SSH configuration updated and service restarted"
-  else
-    restore_file "$sshd_config"
-    log "Failed to restart SSH service, configuration reverted"
-    exit 1
-  fi
-}
 
 # 函数：更新系统设置
 update_system() {
@@ -101,27 +80,19 @@ configure_fail2ban() {
     log "fail2ban installed"
   fi
 
-  # 创建 fail2ban 配置文件
-  cat <<EOF > /etc/fail2ban/jail.local
-[DEFAULT]
-destemail = qiancsf@163.com
-sendername = Fail2Ban
-
-[sshd]
-backend = systemd
-enabled = true
-port = 2222
-mode = aggressive
-bantime = 240h
-findtime = 60m
-maxretry = 1
-EOF
+  # 复制默认的配置文件
+  cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 
   # 修改 fail2ban.conf 文件中的 allowipv6
   sed -i 's/#allowipv6 = auto/allowipv6 = auto/' /etc/fail2ban/fail2ban.conf
+  sed -i 's/backend = auto/backend = systemd/' /etc/fail2ban/jail.local
+  sed -i 's/^bantime  = .*/bantime  = 30d/' /etc/fail2ban/jail.local
+  sed -i 's/^findtime  = .*/findtime  = 30d/' /etc/fail2ban/jail.local
+  sed -i 's/^maxretry = .*/maxretry = 1/' /etc/fail2ban/jail.local
+  sed -i 's/^mode = normal/mode = aggressive/' /etc/fail2ban/jail.local
+  sed -i -E 's/(banaction\s*=\s*).*$/\1nftables-multiport/' /etc/fail2ban/jail.local
+  sed -i -E 's/(banaction_allports\s*=\s*).*$/\1nftables-allports/' /etc/fail2ban/jail.local
   
-  # 设置日志清理计划
-  echo "0 0 * * * truncate -s 0 /var/log/fail2ban.log" >> /etc/crontab
   systemctl restart fail2ban
   log "fail2ban configured and service restarted"
 }
@@ -137,8 +108,16 @@ start_nftables() {
 log "Script started"
 check_root
 add_ssh_key
-update_ssh_config
 update_system
 configure_fail2ban
 start_nftables
 log "Script completed"
+
+cat << EOF >> /etc/ssh/sshd_config
+Port 2233
+PasswordAuthentication no
+PubkeyAuthentication yes
+EOF
+systemctl restart ssh
+
+
